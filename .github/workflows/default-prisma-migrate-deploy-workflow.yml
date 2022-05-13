@@ -64,11 +64,10 @@ jobs:
 
       - name: Get SSM DB Connection string
         run: |
-          aws get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }} | jq -r '.Parameter.Value'
-          echo "::set-output name=CONNECTION_STRING::$(aws get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }}/)"
-        id: version
+          DATABASE_CONNECTION_STRING=aws get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }}/APPLICATION_POSTGRES_${{input.DATABASE}}_DB_EDITOR_CONNECTION_STRING | jq -r '.Parameter.Value'
+          echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
+        id: DB
 
-      - name: Build, Test, & Deploy
-        run: |
-          prisma migrate deploy
-          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} npm run deploy
+      # - name: Build, Test, & Deploy
+      #   run: |
+      #     prisma migrate deploy
