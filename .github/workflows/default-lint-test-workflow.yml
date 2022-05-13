@@ -32,7 +32,7 @@ jobs:
         env:
           AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
-      - name: Build, Test, & Deploy
+      - name: Install, Lint, & Test
         run: |
           npm install
           npm run lint
