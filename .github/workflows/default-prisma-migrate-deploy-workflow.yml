@@ -62,9 +62,11 @@ jobs:
           ENVIRONMENT=${{ inputs.ENVIRONMENT }}
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
           DATABASE=${{ inputs.DATABASE }}
+          SSM_NAME=${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/APPLICATION_POSTGRES_${DATABASE}_DB_EDITOR_CONNECTION_STRING
+          echo $SSM_NAME
 
           echo "Retrieving SSM DB Connection String"
-          aws ssm get-parameter --name `/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/APPLICATION_POSTGRES_${DATABASE}_DB_EDITOR_CONNECTION_STRING` | jq -r '.Parameter.Value'
+          aws ssm get-parameter --name $SSM_NAME | jq -r '.Parameter.Value'
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
