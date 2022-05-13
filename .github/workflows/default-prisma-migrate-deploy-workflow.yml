@@ -1,4 +1,4 @@
-name: Reusable serverless deployment workflow
+name: Reusable prisma migration deployment workflow
 
 on:
   workflow_call:
@@ -26,12 +26,6 @@ on:
         required: true
 
 jobs:
-  serverless-build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-
   prisma-migrate-deploy:
     runs-on: ubuntu-latest
     steps:
@@ -64,7 +58,7 @@ jobs:
 
       - name: Get SSM DB Connection string
         run: |
-          DATABASE_CONNECTION_STRING=aws get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }}/APPLICATION_POSTGRES_${{input.DATABASE}}_DB_EDITOR_CONNECTION_STRING | jq -r '.Parameter.Value'
+          DATABASE_CONNECTION_STRING=aws get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }}/APPLICATION_POSTGRES_${{ inputs.DATABASE }}_DB_EDITOR_CONNECTION_STRING | jq -r '.Parameter.Value'
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
