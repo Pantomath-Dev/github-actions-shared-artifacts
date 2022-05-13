@@ -66,7 +66,7 @@ jobs:
           echo $SSM_NAME
 
           echo "Retrieving SSM DB Connection String"
-          aws ssm get-parameter --name $SSM_NAME | jq -r '.Parameter.Value'
+          DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
