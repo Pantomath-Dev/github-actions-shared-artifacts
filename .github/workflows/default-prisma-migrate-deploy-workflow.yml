@@ -62,15 +62,14 @@ jobs:
           ENVIRONMENT=${{ inputs.ENVIRONMENT }}
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
           DATABASE=${{ inputs.DATABASE }}
-          SSM_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/APPLICATION_POSTGRES_${DATABASE}_DB_EDITOR_CONNECTION_STRING
+          SSM_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/APPLICATION_POSTGRES_${DATABASE}_DB_MIGRATOR_CONNECTION_STRING
           echo $SSM_NAME
 
           echo "Retrieving SSM DB Connection String"
           DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
-          echo $DATABASE_CONNECTION_STRING
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
-      # - name: Build, Test, & Deploy
-      #   run: |
-      #     prisma migrate deploy
+      - name: Build, Test, & Deploy
+        run: |
+          echo $DATABASE_CONNECTION_STRING
