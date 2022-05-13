@@ -58,7 +58,7 @@ jobs:
 
       - name: Get SSM DB Connection string
         run: |
-          DATABASE_CONNECTION_STRING=aws get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }}/APPLICATION_POSTGRES_${{ inputs.DATABASE }}_DB_EDITOR_CONNECTION_STRING | jq -r '.Parameter.Value'
+          DATABASE_CONNECTION_STRING=aws ssm get-parameter --name ${{ inputs.ENVIRONMENT }}/${{ inputs.DEPLOYMENT_PREFIX }}/APPLICATION_POSTGRES_${{ inputs.DATABASE }}_DB_EDITOR_CONNECTION_STRING | jq -r '.Parameter.Value'
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
