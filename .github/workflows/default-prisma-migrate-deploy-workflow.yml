@@ -56,9 +56,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      - name: Get SSM DB Connection string
+      - name: Get SSM DB Connection string and Run Prisma Migrate
         run: |
-          echo "Mapping inputs to ENV vars"
+          echo "Generating SSM Name"
           ENVIRONMENT=${{ inputs.ENVIRONMENT }}
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
           DATABASE=${{ inputs.DATABASE }}
@@ -67,6 +67,7 @@ jobs:
 
           echo "Retrieving SSM DB Connection String"
           DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
+          echo $DATABASE_CONNECTION_STRING
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
