@@ -71,11 +71,12 @@ jobs:
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
-      - name: Build, Test, & Deploy
+      - name: Install Dependencies & Deploy Migrations
         run: |
           echo "Setting DB Connection String..."
-          echo $DATABASE_CONNECTION_STRING
-          APPLICATION_POSTGRES_CONNECTION_STRING=$DATABASE_CONNECTION_STRING
+          echo "${{ steps.DB.outputs.CONNECTION_STRING }}"
+          env
+          APPLICATION_POSTGRES_CONNECTION_STRING=${{ steps.DB.outputs.CONNECTION_STRING }}
           echo "Clean runnings..."
           npm run clean
           echo "Applying Prisma migrations to database..."
