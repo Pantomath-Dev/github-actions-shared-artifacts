@@ -41,6 +41,7 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: '3.7'
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -58,19 +59,21 @@ jobs:
 
       - name: Get SSM DB Connection string and Run Prisma Migrate
         run: |
-          echo "Generating SSM Name"
+          echo "Generating SSM Name..."
           ENVIRONMENT=${{ inputs.ENVIRONMENT }}
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
           DATABASE=${{ inputs.DATABASE }}
           SSM_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/APPLICATION_POSTGRES_${DATABASE}_DB_MIGRATOR_CONNECTION_STRING
           echo $SSM_NAME
 
-          echo "Retrieving SSM DB Connection String"
+          echo "Retrieving SSM DB Connection String..."
           DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
       - name: Build, Test, & Deploy
         run: |
-          echo "Applying Prisma migrations to database"
-          APPLICATION_POSTGRES_CONNECTION_STRING=$DATABASE_CONNECTION_STRING prisma-apply-migrations
+          echo "Clean runnings..."
+          npm run clean
+          echo "Applying Prisma migrations to database..."
+          APPLICATION_POSTGRES_CONNECTION_STRING=$DATABASE_CONNECTION_STRING npm run prisma-apply-migrations
