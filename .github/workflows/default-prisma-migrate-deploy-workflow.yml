@@ -57,6 +57,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
+      - name: Create .npmrc
+        uses: FerLuisxd/create-npmrc@3
+        with:
+          org_name: ${{ inputs.ORG_NAME }}
+        env:
+          AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+
       - name: Get SSM DB Connection string and Run Prisma Migrate
         run: |
           echo "Generating SSM Name..."
@@ -75,9 +82,12 @@ jobs:
         run: |
           echo "Setting DB Connection String..."
           APPLICATION_POSTGRES_CONNECTION_STRING=${{ steps.DB.outputs.CONNECTION_STRING }}
-          echo $APPLICATION_POSTGRES_CONNECTION_STRING
+
+          echo "Saving DB Connection String to .env file..."
           echo "APPLICATION_POSTGRES_CONNECTION_STRING"=$APPLICATION_POSTGRES_CONNECTION_STRING >> ".env"
+
           echo "Clean runnings..."
           npm run clean
+
           echo "Applying Prisma migrations to database..."
           npm run prisma-apply-migrations
