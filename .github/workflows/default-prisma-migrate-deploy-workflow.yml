@@ -72,4 +72,5 @@ jobs:
 
       - name: Build, Test, & Deploy
         run: |
-          echo $DATABASE_CONNECTION_STRING
+          echo "Applying Prisma migrations to database"
+          APPLICATION_POSTGRES_CONNECTION_STRING=$DATABASE_CONNECTION_STRING prisma-apply-migrations
