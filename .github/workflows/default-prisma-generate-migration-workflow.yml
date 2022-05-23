@@ -24,6 +24,8 @@ on:
         required: true
       PACKAGES_TOKEN:
         required: true
+      PRIVATE_REPO_WRITER:
+        required: true
 
 jobs:
   prisma-create-and-pr-migrations:
@@ -64,7 +66,7 @@ jobs:
         env:
           AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
-      - name: Get SSM DB Connection string and Run Prisma Migrate
+      - name: Get SSM DB Connection string
         run: |
           echo "Generating SSM Name..."
           ENVIRONMENT=${{ inputs.ENVIRONMENT }}
@@ -78,25 +80,6 @@ jobs:
           echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
         id: DB
 
-      - name: Install Dependencies & Deploy Migrations
-        run: |
-          echo "Setting DB Connection String..."
-          APPLICATION_POSTGRES_CONNECTION_STRING=${{ steps.DB.outputs.CONNECTION_STRING }}
-
-          echo "Saving DB Connection String to .env file..."
-          echo "APPLICATION_POSTGRES_CONNECTION_STRING"=$APPLICATION_POSTGRES_CONNECTION_STRING >> ".env"
-
-          echo "Clean runnings..."
-          npm run clean
-
-          echo "Applying Prisma migrations to database..."
-          npm run prisma-apply-migrations
-
-      - name: Take them there migrations and PR them to the proper repo
-        run: |
-          ls -la
-          pwd
-
       - name: Checkout Migrations Repo
         uses: actions/checkout@v3
         with:
@@ -104,9 +87,55 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_WRITER }}
           path: ${{ inputs.ENVIRONMENT }}-database-migrations
 
-      - name: CD into the proper directory
+      - name: Install Dependencies & Create Migration
         run: |
-          ls -la
-          pwd
+          echo "Setting DB Connection String..."
+          APPLICATION_POSTGRES_CONNECTION_STRING=${{ steps.DB.outputs.CONNECTION_STRING }}
+
+          echo "Saving DB Connection String to .env file..."
+          echo "APPLICATION_POSTGRES_CONNECTION_STRING"=$APPLICATION_POSTGRES_CONNECTION_STRING >> ".env"
+
+          echo "Copy old migrations from migration repo to repo migrations folder"
+          mkdir -p ./prisma/migrations
+          DATABASE_LOWERCASE=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
+          cp -a ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations ./prisma/.
+          tree ./
+
+          echo "Clean runnings..."
+          npm run clean
+
+          echo "Creating Prisma migration against proper database..."
+          npm run prisma-create-migration -- --name migration
+
+      - name: Copy Migrations to the Proper DB Migration Repo
+        run: |
+          DATABASE_LOWERCASE=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
+
+          echo "Copy generated migrations to proper db migrations repo and folder"
+          mkdir -p ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations
+          cp -a ./prisma/schema.prisma ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma
+          cp -a ./prisma/migrations/. ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations/
+
+          echo "Navigating to ${{ inputs.ENVIRONMENT }}-database-migrations directory"
+          tree ${{ inputs.ENVIRONMENT }}-database-migrations
           cd ./${{ inputs.ENVIRONMENT }}-database-migrations
-          ls -la
+
+          # echo "Setting up git config in directory"
+          # git config user.name "GitHub Actions Bot"
+          # git config user.email "<githubactionsbot@pantomathglobal.com>"
+
+      - name: Get Current Date to Append to Branch Name
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_WRITER }}
+          commit-message: Creating new migration
+          branch: new-migration-${{ steps.date.outputs.date }}
+          title: ${{ github.event.head_commit.message }}
+          path: ${{ inputs.ENVIRONMENT }}-database-migrations
+          committer: Github Actions Bot <githubactionsbot@pantomathglobal.com>
+          author: Github Actions Bot <githubactionsbot@pantomathglobal.com>
