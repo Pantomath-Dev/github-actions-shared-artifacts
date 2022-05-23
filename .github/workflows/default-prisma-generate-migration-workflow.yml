@@ -1,0 +1,112 @@
+name: Reusable prisma migration generation workflow
+
+on:
+  workflow_call:
+    inputs:
+      DEPLOYMENT_PREFIX:
+        required: true
+        type: string
+      ENVIRONMENT:
+        required: true
+        type: string
+      ORG_NAME:
+        required: true
+        type: string
+      DATABASE:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      PACKAGES_TOKEN:
+        required: true
+
+jobs:
+  prisma-create-and-pr-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+
+      - name: Setup Nodejs
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Installing AWS CLI
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install awscli
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Create .npmrc
+        uses: FerLuisxd/create-npmrc@3
+        with:
+          org_name: ${{ inputs.ORG_NAME }}
+        env:
+          AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+
+      - name: Get SSM DB Connection string and Run Prisma Migrate
+        run: |
+          echo "Generating SSM Name..."
+          ENVIRONMENT=${{ inputs.ENVIRONMENT }}
+          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
+          DATABASE=${{ inputs.DATABASE }}
+          SSM_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/APPLICATION_POSTGRES_${DATABASE}_DB_MIGRATOR_CONNECTION_STRING
+          echo $SSM_NAME
+
+          echo "Retrieving SSM DB Connection String..."
+          DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
+          echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING"
+        id: DB
+
+      - name: Install Dependencies & Deploy Migrations
+        run: |
+          echo "Setting DB Connection String..."
+          APPLICATION_POSTGRES_CONNECTION_STRING=${{ steps.DB.outputs.CONNECTION_STRING }}
+
+          echo "Saving DB Connection String to .env file..."
+          echo "APPLICATION_POSTGRES_CONNECTION_STRING"=$APPLICATION_POSTGRES_CONNECTION_STRING >> ".env"
+
+          echo "Clean runnings..."
+          npm run clean
+
+          echo "Applying Prisma migrations to database..."
+          npm run prisma-apply-migrations
+
+      - name: Take them there migrations and PR them to the proper repo
+        run: |
+          ls -la
+          pwd
+
+      - name: Checkout Migrations Repo
+        uses: actions/checkout@v3
+        with:
+          repository: Pantomath-Dev/${{ inputs.ENVIRONMENT }}-database-migrations
+          token: ${{ secrets.PRIVATE_REPO_WRITER }}
+          path: ${{ inputs.ENVIRONMENT }}-database-migrations
+
+      - name: CD into the proper directory
+        run: |
+          ls -la
+          pwd
+          cd ./${{ inputs.ENVIRONMENT }}-database-migrations
+          ls -la

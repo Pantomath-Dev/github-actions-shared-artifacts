@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "target": "es2015",
+    "sourceMap": false,
+    "module": "commonjs",
+    "lib": ["es5", "es6", "dom"],
+    "strictNullChecks": true,
+    "downlevelIteration": true,
+    "resolveJsonModule": true,
+    "rootDir": "./src",
+    "removeComments": true,
+    "preserveConstEnums": true
+  },
+  "compileOnSave": true,
+  "exclude": [
+    "./**/__test__"
+  ]
+}
