@@ -135,7 +135,7 @@ jobs:
         with:
           token: ${{ secrets.PRIVATE_REPO_WRITER }}
           commit-message: Creating new migration
-          branch: ${{ steps.CREATE-MIGRATION.outputs.NEW_MIGRATION_NAME }}
+          branch: constant
           title: ${{ github.event.head_commit.message }}
           path: ${{ inputs.ENVIRONMENT }}-database-migrations
           committer: Github Actions Bot <githubactionsbot@pantomathglobal.com>
