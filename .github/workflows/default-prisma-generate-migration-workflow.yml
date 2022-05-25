@@ -44,7 +44,7 @@ jobs:
         with:
           python-version: '3.7'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install awscli
@@ -66,7 +66,7 @@ jobs:
         env:
           AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
-      - name: Get SSM DB Connection string
+      - name: Get SSM DB Connection String
         run: |
           echo "Generating SSM Name..."
           ENVIRONMENT=${{ inputs.ENVIRONMENT }}
@@ -99,13 +99,19 @@ jobs:
           mkdir -p ./prisma/migrations
           DATABASE_LOWERCASE=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
           cp -a ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations ./prisma/.
-          tree ./
 
           echo "Clean runnings..."
           npm run clean
 
           echo "Creating Prisma migration against proper database..."
           npm run prisma-create-migration -- --name migration
+
+          echo "Retrieving the name of the new migration and outputing..."
+          cd ./prisma/migrations 
+          NEW_MIGRATION_NAME="$(ls -Art | tail -n 1)"
+          echo "::set-output name=NEW_MIGRATION_NAME::$NEW_MIGRATION_NAME"
+          cd ../../
+        id: CREATE-MIGRATION
 
       - name: Copy Migrations to the Proper DB Migration Repo
         run: |
@@ -118,11 +124,6 @@ jobs:
 
           echo "Navigating to ${{ inputs.ENVIRONMENT }}-database-migrations directory"
           tree ${{ inputs.ENVIRONMENT }}-database-migrations
-          cd ./${{ inputs.ENVIRONMENT }}-database-migrations
-
-          # echo "Setting up git config in directory"
-          # git config user.name "GitHub Actions Bot"
-          # git config user.email "<githubactionsbot@pantomathglobal.com>"
 
       - name: Get Current Date to Append to Branch Name
         id: date
@@ -134,7 +135,7 @@ jobs:
         with:
           token: ${{ secrets.PRIVATE_REPO_WRITER }}
           commit-message: Creating new migration
-          branch: new-migration-${{ steps.date.outputs.date }}
+          branch: ${{ steps.CREATE-MIGRATION.outputs.NEW_MIGRATION_NAME }}
           title: ${{ github.event.head_commit.message }}
           path: ${{ inputs.ENVIRONMENT }}-database-migrations
           committer: Github Actions Bot <githubactionsbot@pantomathglobal.com>
