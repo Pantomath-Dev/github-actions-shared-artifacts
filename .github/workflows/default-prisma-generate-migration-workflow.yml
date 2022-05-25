@@ -104,6 +104,7 @@ jobs:
 
           echo "Copy old migrations from migration repo to repo migrations folder"
           mkdir -p ./prisma/migrations
+          mkdir -p ./${{ inputs.ENVIRONMENT }}-database-migrations/${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}/prisma/migrations
           cp -a ./${{ inputs.ENVIRONMENT }}-database-migrations/${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}/prisma/migrations ./prisma/.
 
           echo "Clean runnings..."
