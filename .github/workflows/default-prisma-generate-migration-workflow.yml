@@ -87,6 +87,13 @@ jobs:
           token: ${{ secrets.PRIVATE_REPO_WRITER }}
           path: ${{ inputs.ENVIRONMENT }}-database-migrations
 
+      - name: Generate and Output Lowercase DB Name
+        run: |
+          echo "Generating lowercase DB name..."
+          LOWERCASE_DATABASE_NAME=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
+          echo "::set-output name=LOWERCASE_DATABASE_NAME::$LOWERCASE_DATABASE_NAME"
+        id: LOWERCASE-DATABASE
+
       - name: Install Dependencies & Create Migration
         run: |
           echo "Setting DB Connection String..."
@@ -97,8 +104,7 @@ jobs:
 
           echo "Copy old migrations from migration repo to repo migrations folder"
           mkdir -p ./prisma/migrations
-          DATABASE_LOWERCASE=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
-          cp -a ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations ./prisma/.
+          cp -a ./${{ inputs.ENVIRONMENT }}-database-migrations/${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}/prisma/migrations ./prisma/.
 
           echo "Clean runnings..."
           npm run clean
@@ -115,28 +121,26 @@ jobs:
 
       - name: Copy Migrations to the Proper DB Migration Repo
         run: |
-          DATABASE_LOWERCASE=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
-
           echo "Copy generated migrations to proper db migrations repo and folder"
-          mkdir -p ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations
-          cp -a ./prisma/schema.prisma ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma
-          cp -a ./prisma/migrations/. ./${{ inputs.ENVIRONMENT }}-database-migrations/${DATABASE_LOWERCASE}/prisma/migrations/
+          mkdir -p ./${{ inputs.ENVIRONMENT }}-database-migrations/${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}/prisma/migrations
+          cp -a ./prisma/schema.prisma ./${{ inputs.ENVIRONMENT }}-database-migrations/${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}/prisma
+          cp -a ./prisma/migrations/. ./${{ inputs.ENVIRONMENT }}-database-migrations/${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}/prisma/migrations/
 
           echo "Navigating to ${{ inputs.ENVIRONMENT }}-database-migrations directory"
           tree ${{ inputs.ENVIRONMENT }}-database-migrations
 
       - name: Get Current Date to Append to Branch Name
-        id: date
         run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        id: DATE
 
       - name: Create Pull Request
         id: cpr
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.PRIVATE_REPO_WRITER }}
-          commit-message: Creating new migration
-          branch: constant
-          title: ${{ github.event.head_commit.message }}
+          commit-message: Creating new migration ${{ steps.CREATE-MIGRATION.outputs.NEW_MIGRATION_NAME }} for ${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }} DB
+          branch: new-${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}-db-migration
+          title: new-${{ steps.LOWERCASE-DATABASE.outputs.LOWERCASE_DATABASE_NAME }}-db-migration
           path: ${{ inputs.ENVIRONMENT }}-database-migrations
           committer: Github Actions Bot <githubactionsbot@pantomathglobal.com>
           author: Github Actions Bot <githubactionsbot@pantomathglobal.com>
