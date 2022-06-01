@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: Pantomath-Dev/${{ inputs.ENVIRONMENT }}-database-migrations
-          token: ${{ secrets.PRIVATE_REPO_WRITER }}
+          token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
           path: ${{ inputs.ENVIRONMENT }}-database-migrations
 
       - name: Generate and Output Lowercase DB Name
@@ -93,6 +93,14 @@ jobs:
           LOWERCASE_DATABASE_NAME=$(echo 'console.log("${{ inputs.DATABASE }}".toLowerCase())' | node -);
           echo "::set-output name=LOWERCASE_DATABASE_NAME::$LOWERCASE_DATABASE_NAME"
         id: LOWERCASE-DATABASE
+
+      - name: Wait for Prisma Apply to Succeed if Running
+        uses: fountainhead/action-wait-for-check@v1.0.0
+        with:
+          token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
+          checkName: invoke-default-prisma-migrate-deploy-workflow
+          repo: ${{ inputs.ENVIRONMENT }}-database-migrations
+        id: WAIT-FOR-BUILD
 
       - name: Install Dependencies & Create Migration
         run: |
