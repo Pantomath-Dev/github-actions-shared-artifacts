@@ -103,14 +103,36 @@ jobs:
           cd ../
         id: MIGRATION-REPO-HASH
 
-      - name: Wait for Prisma Apply to Succeed if Running
+      - name: Check Prisma Apply Build in Database Repo
         uses: fountainhead/action-wait-for-check@v1.0.0
         with:
           token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
           checkName: 'invoke-default-prisma-migrate-deploy-workflow / prisma-migrate-deploy'
           repo: ${{ inputs.ENVIRONMENT }}-database-migrations
           ref: ${{ steps.MIGRATION-REPO-HASH.outputs.HASH }}
+          timeoutSeconds: 10
+          intervalSeconds: 5
         id: WAIT-FOR-BUILD
+
+      - name: Handle Successful Migration Apply Build
+        if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'success'
+        run: echo 'Previous migration apply succeeded in ${{ inputs.ENVIRONMENT }}-database-migrations repo. You are now free to move about the build process.'
+
+      - name: Handle Failed Migration Apply Build
+        if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'failure'
+        run: echo 'Previous migration apply failed in ${{ inputs.ENVIRONMENT }}-database-migrations repo. Resolve this issue before generating new migrations.' && false
+
+      - name: Handle Running Migration Apply Build
+        if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'timed_out'
+        run: echo 'Migration apply build running in ${{ inputs.ENVIRONMENT }}-database-migrations repo. Ensure no apply builds are running and rerun this build' && false
+
+      - name: Handle Neutral Migration Apply Build
+        if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'neutral'
+        run: echo 'Migration apply build neutral status in ${{ inputs.ENVIRONMENT }}-database-migrations repo. Ensure no apply builds are running and rerun this build' && false
+
+      - name: Handle Action Required Migration Apply Build
+        if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'action_required'
+        run: echo 'Migration apply build running and requires action in ${{ inputs.ENVIRONMENT }}-database-migrations repo. Ensure no apply builds are running and rerun this build' && false
 
       - name: Install Dependencies & Create Migration
         run: |
