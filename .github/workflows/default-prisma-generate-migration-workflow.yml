@@ -94,12 +94,22 @@ jobs:
           echo "::set-output name=LOWERCASE_DATABASE_NAME::$LOWERCASE_DATABASE_NAME"
         id: LOWERCASE-DATABASE
 
+      - name: Retrieve Migration Repo Hash
+        run: |
+          echo "Generating repo hash..."
+          cd ./${{ inputs.ENVIRONMENT }}-database-migrations
+          HASH=$(git rev-parse HEAD);
+          echo "::set-output name=HASH::$HASH"
+          cd ../
+        id: MIGRATION-REPO-HASH
+
       - name: Wait for Prisma Apply to Succeed if Running
         uses: fountainhead/action-wait-for-check@v1.0.0
         with:
           token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
           checkName: invoke-default-prisma-migrate-deploy-workflow
           repo: ${{ inputs.ENVIRONMENT }}-database-migrations
+          ref: ${{ steps.MIGRATION-REPO-HASH.outputs.HASH }}
         id: WAIT-FOR-BUILD
 
       - name: Install Dependencies & Create Migration
