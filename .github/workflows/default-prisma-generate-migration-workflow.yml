@@ -107,7 +107,7 @@ jobs:
         uses: fountainhead/action-wait-for-check@v1.0.0
         with:
           token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
-          checkName: invoke-default-prisma-migrate-deploy-workflow
+          checkName: 'invoke-default-prisma-migrate-deploy-workflow / prisma-migrate-deploy'
           repo: ${{ inputs.ENVIRONMENT }}-database-migrations
           ref: ${{ steps.MIGRATION-REPO-HASH.outputs.HASH }}
         id: WAIT-FOR-BUILD
