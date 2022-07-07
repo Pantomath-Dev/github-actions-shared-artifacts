@@ -54,6 +54,4 @@ jobs:
       - name: Build, Test, & Deploy
         run: |
           npm install
-          npm run lint
-          npm test
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} npm run deploy
