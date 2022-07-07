@@ -3,6 +3,9 @@ name: Reusable serverless deployment workflow
 on:
   workflow_call:
     inputs:
+      PRISMA_BUILD_TARGET:
+        required: false
+        type: string
       DEPLOYMENT_PREFIX:
         required: true
         type: string
