@@ -43,7 +43,7 @@ jobs:
         run: npm install
 
       - name: Optionally Generate Prisma Client(s)
-        if: secretes.GENERATE_PRISMA_CLIENT == 'true'
+        if: secrets.GENERATE_PRISMA_CLIENT == 'true'
         run: npm run prisma-generate-clients
 
       - name: Lint & Test
