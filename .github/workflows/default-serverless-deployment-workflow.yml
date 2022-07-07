@@ -67,6 +67,10 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm install
 
+      - name: Optionally Generate Prisma Client(s)
+        if: secretes.GENERATE_PRISMA_CLIENT == 'true'
+        run: npm run prisma-generate-clients
+
       - name: Deploy
         run: |
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} npm run deploy

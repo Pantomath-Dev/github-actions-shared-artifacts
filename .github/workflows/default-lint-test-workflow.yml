@@ -14,9 +14,6 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-
       - name: Setup Nodejs
         uses: actions/setup-node@v1
         with:
@@ -41,9 +38,13 @@ jobs:
           path: node_modules
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Install Dependencies
+      - name: Optionally Install Dependencies
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm install
+
+      - name: Optionally Generate Prisma Client(s)
+        if: secretes.GENERATE_PRISMA_CLIENT == 'true'
+        run: npm run prisma-generate-clients
 
       - name: Lint & Test
         run: |
