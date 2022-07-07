@@ -54,7 +54,7 @@ jobs:
         env:
           AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
-      - name: Build, Test, & Deploy
+      - name: Build & Deploy
         run: |
           npm install
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} npm run deploy
