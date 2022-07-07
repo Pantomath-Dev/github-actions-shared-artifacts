@@ -70,4 +70,4 @@ jobs:
       - name: Build & Deploy
         run: |
           npm run build
-          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} npm run deploy
+          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} PRISMA_BUILD_TARGET=${{ inputs.PRISMA_BUILD_TARGET }} npm run deploy
