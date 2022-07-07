@@ -49,7 +49,7 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm install
 
-      - name: Lint, & Test
+      - name: Lint & Test
         run: |
           npm run lint
           npm test
