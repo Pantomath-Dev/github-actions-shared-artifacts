@@ -33,7 +33,7 @@ jobs:
         uses: easimon/maximize-build-space@master
         with:
           root-reserve-mb: 512
-          swap-size-mb: 1024
+          swap-size-mb: 8192
           remove-dotnet: 'true'
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.9.1
