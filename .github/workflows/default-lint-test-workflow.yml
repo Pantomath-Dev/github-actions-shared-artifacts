@@ -14,9 +14,6 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-
       - name: Setup Nodejs
         uses: actions/setup-node@v1
         with:
@@ -32,8 +29,21 @@ jobs:
         env:
           AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
-      - name: Install, Lint, & Test
+      - name: Cache node modules
+        id: cache-nodemodules
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install Dependencies
+        if: steps.cache-nodemodules.outputs.cache-hit != 'true'
+        run: npm install
+
+      - name: Build, Lint & Test
         run: |
-          npm install
+          npm run build
           npm run lint
           npm test
