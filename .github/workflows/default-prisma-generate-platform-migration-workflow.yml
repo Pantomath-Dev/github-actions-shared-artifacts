@@ -1,0 +1,239 @@
+name: Reusable platform prisma migration generation workflow
+
+on:
+  workflow_call:
+    inputs:
+      DEPLOYMENT_PREFIX:
+        required: true
+        type: string
+      ENVIRONMENT:
+        required: true
+        type: string
+      ORG_NAME:
+        required: true
+        type: string
+      DATABASE:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      PACKAGES_TOKEN:
+        required: true
+      PRIVATE_REPO_WRITER:
+        required: true
+
+jobs:
+  get-customers:
+    runs-on: ubuntu-latest
+    outputs:
+      customers: ${{ steps.RETURN.outputs.CUSTOMERS }}
+    steps:
+      - name: Installing AWS CLI
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install awscli
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get Platform API Param Values
+        run: |
+          echo "Retrieving all customers..."
+          ENVIRONMENT=${{ inputs.ENVIRONMENT }}
+          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
+
+          PLATFORM_CORE_URL_SSM_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/SERVICE_MOCKS_CORE
+          echo $PLATFORM_CORE_URL_SSM_NAME
+
+          PLATFORM_CORE_API_KEY_SSM_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/SERVICE_MOCKS_CORE_API_KEY
+          echo $PLATFORM_CORE_API_KEY_SSM_NAME
+
+          echo "Retrieving Platform Core URL..."
+          URL="$(aws ssm get-parameter --name $PLATFORM_CORE_URL_SSM_NAME | jq -r '.Parameter.Value')"
+          echo URL
+          echo "::set-output name=URL::$URL"
+
+          echo "Retrieving Platform Core API KEY..."
+          echo API_KEY
+          API_KEY="$(aws ssm get-parameter --name $PLATFORM_CORE_API_KEY_SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
+          echo "::set-output name=API_KEY::$API_KEY"
+        id: PLATFORM-CORE
+
+      - name: Get All Customers from Customer Platform Core API
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: '${{ steps.PLATFORM-CORE.outputs.URL }}/customers'
+          method: 'GET'
+          customHeaders: '{"Content-Type": "application/json", "x-smocks-api-key": "${{ steps.PLATFORM-CORE.outputs.API_KEY }}"}'
+        id: GET-CUSTOMERS
+
+      - name: Save Customers to Output and Implicitly Matrix
+        run: |
+          echo "Retrieving all customers as output..."
+          CUSTOMERS_RESPONSE=${{ toJson(steps.GET-CUSTOMERS.outputs.response) }}
+          CUSTOMERS=$(echo $CUSTOMERS_RESPONSE | jq -c '.items')
+          echo $CUSTOMERS
+          echo "::set-output name=CUSTOMERS::$CUSTOMERS"
+        id: RETURN
+
+  prisma-create-and-pr-platform-migrations:
+    runs-on: ubuntu-latest
+    needs: get-customers
+    strategy:
+      matrix:
+        customer: ${{fromJson(needs.get-customers.outputs.customers)}}
+    steps:
+      - name: Setup Nodejs
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Create .npmrc
+        uses: FerLuisxd/create-npmrc@3
+        with:
+          org_name: ${{ inputs.ORG_NAME }}
+        env:
+          AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+
+      - name: Checkout Migrations Repo
+        uses: actions/checkout@v3
+        with:
+          repository: Pantomath-Dev/${{ inputs.ENVIRONMENT }}-database-migrations-test
+          token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
+          path: ${{ inputs.ENVIRONMENT }}-database-migrations-test
+
+      # - name: Retrieve Migration Repo Hash
+      #   run: |
+      #     echo "Generating repo hash..."
+      #     cd ./${{ inputs.ENVIRONMENT }}-database-migrations-test
+      #     HASH=$(git rev-parse HEAD);
+      #     echo "::set-output name=HASH::$HASH"
+      #     cd ../
+      #   id: MIGRATION-REPO-HASH
+
+      # - name: Check Prisma Apply Build in Database Repo
+      #   uses: fountainhead/action-wait-for-check@v1.0.0
+      #   with:
+      #     token: ${{ secrets.PRIVATE_REPO_WRITER }} # Owned by Joe
+      #     checkName: 'invoke-default-prisma-apply-platform-migrations-workflow / platform-prisma-migrate-deploy'
+      #     repo: ${{ inputs.ENVIRONMENT }}-database-migrations-test
+      #     ref: ${{ steps.MIGRATION-REPO-HASH.outputs.HASH }}
+      #     timeoutSeconds: 10
+      #     intervalSeconds: 5
+      #   id: WAIT-FOR-BUILD
+
+      # - name: Handle Successful Migration Apply Build
+      #   if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'success'
+      #   run: echo 'Previous migration apply succeeded in ${{ inputs.ENVIRONMENT }}-database-migrations-test repo. You are now free to move about the build process.'
+
+      # - name: Handle Failed Migration Apply Build
+      #   if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'failure'
+      #   run: echo 'Previous migration apply failed in ${{ inputs.ENVIRONMENT }}-database-migrations-test repo. Resolve this issue before generating new migrations.' && false
+
+      # - name: Handle Running Migration Apply Build
+      #   if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'timed_out'
+      #   run: echo 'Migration apply build running in ${{ inputs.ENVIRONMENT }}-database-migrations-test repo. Ensure no apply builds are running and rerun this build' && false
+
+      # - name: Handle Neutral Migration Apply Build
+      #   if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'neutral'
+      #   run: echo 'Migration apply build neutral status in ${{ inputs.ENVIRONMENT }}-database-migrations-test repo. Ensure no apply builds are running and rerun this build' && false
+
+      # - name: Handle Action Required Migration Apply Build
+      #   if: steps.WAIT-FOR-BUILD.outputs.conclusion == 'action_required'
+      #   run: echo 'Migration apply build running and requires action in ${{ inputs.ENVIRONMENT }}-database-migrations-test repo. Ensure no apply builds are running and rerun this build' && false
+
+      - name: Get Platform DB Connection String
+        run: |
+          echo "Generating SSM Name..."
+          ENVIRONMENT=${{ inputs.ENVIRONMENT }}
+          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
+          DATABASE=${{ inputs.DATABASE }}
+          SSM_NAME=${{ matrix.customer.databaseConnectionRef }}
+          echo $SSM_NAME
+          echo "Retrieving SSM DB Connection String..."
+          DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_NAME --with-decryption | jq -r '.Parameter.Value')"
+          echo "::set-output name=CONNECTION_STRING::$DATABASE_CONNECTION_STRING?schema=${{ matrix.customer.schema }}"
+        id: PLATFORM-DB
+
+      - name: Install Dependencies & Create Platform Migrations
+        run: |
+          echo "Clean runnings..."
+          npm run clean
+
+          echo "Setting DB Connection String..."
+          PLATFORM_POSTGRES_CONNECTION_STRING=${{ steps.PLATFORM-DB.outputs.CONNECTION_STRING }}
+
+          echo "Saving DB Connection String to .env file..."
+          echo "APPLICATION_POSTGRES_CONNECTION_STRING"=$PLATFORM_POSTGRES_CONNECTION_STRING >> ".env"
+
+          echo "Copy old migrations from migration repo to repo migrations folder"
+          mkdir -p ./prisma/platform/migrations
+          mkdir -p ./${{ inputs.ENVIRONMENT }}-database-migrations-test/platform/${{ matrix.customer.schema }}/migrations
+          cp -a ./${{ inputs.ENVIRONMENT }}-database-migrations-test/platform/${{ matrix.customer.schema }}/migrations ./prisma/platform/.
+
+          echo "Creating Customer Prisma migration against proper database..."
+          ./node_modules/.bin/prisma migrate dev --create-only --schema ./prisma/platform/platform.prisma --name migration
+
+          echo "Retrieving the name of the new migration and outputing..."
+          cd ./prisma/platform/migrations
+          NEW_MIGRATION_NAME="$(ls -Art | tail -n 1)"
+          echo "::set-output name=NEW_MIGRATION_NAME::$NEW_MIGRATION_NAME"
+          cd ../../../
+        id: CREATE-MIGRATION
+
+      - name: Copy Migrations to the Proper DB Migration Repo
+        run: |
+          echo "Copy generated migrations to proper db migrations repo and folder"
+          mkdir -p ./${{ inputs.ENVIRONMENT }}-database-migrations-test/platform/${{ matrix.customer.schema }}/migrations
+          cp -a ./prisma/platform/platform.prisma ./${{ inputs.ENVIRONMENT }}-database-migrations-test/platform/${{ matrix.customer.schema }}/platform.prisma
+          cp -a ./prisma/platform/migrations/. ./${{ inputs.ENVIRONMENT }}-database-migrations-test/platform/${{ matrix.customer.schema }}/migrations/
+
+          echo "Navigating to ${{ inputs.ENVIRONMENT }}-database-migrations-test directory"
+          tree ${{ inputs.ENVIRONMENT }}-database-migrations-test
+
+      - name: Get Current Date to Append to Branch Name
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        id: DATE
+
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_WRITER }}
+          commit-message: Creating new migration ${{ steps.CREATE-MIGRATION.outputs.NEW_MIGRATION_NAME }} for ${{ matrix.customer.schema }} schema
+          branch: ${{ matrix.customer.schema }}-schema-migration
+          title: ${{ matrix.customer.schema }}-schema-migration
+          path: ${{ inputs.ENVIRONMENT }}-database-migrations-test
+          committer: Github Actions Bot <githubactionsbot@pantomathglobal.com>
+          author: Github Actions Bot <githubactionsbot@pantomathglobal.com>
+          body: |
+            Source Repo: ${{ github.event.repository.name }}
+            Source Repo Commit Hash: ${{ github.sha }}
+
+            Customer Id: ${{ matrix.customer.id }}
+            Customer Name: ${{ matrix.customer.name }}
+            Customer Schema: ${{ matrix.customer.schema }}

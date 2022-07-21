@@ -1,0 +1,92 @@
+name: Reusable prisma migration customer deployment workflow
+
+on:
+  workflow_call:
+    inputs:
+      DEPLOYMENT_PREFIX:
+        required: true
+        type: string
+      ENVIRONMENT:
+        required: true
+        type: string
+      ORG_NAME:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      PACKAGES_TOKEN:
+        required: true
+
+jobs:
+  customer-prisma-migrate-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Nodejs
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Installing AWS CLI
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install awscli
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Create .npmrc
+        uses: FerLuisxd/create-npmrc@3
+        with:
+          org_name: ${{ inputs.ORG_NAME }}
+        env:
+          AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+
+      - name: Apply Customer Migrations for Each Database
+        run: |
+          echo "Generating SSM Connection String Name..."
+          ENVIRONMENT=${{ inputs.ENVIRONMENT }}
+          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }}
+          SSM_CONNECTION_STRING_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/CUSTOMER_DB_MIGRATOR_CONNECTION_STRING
+          echo $SSM_CONNECTION_STRING_NAME
+
+          echo "Generating SSM DB Identifier Name..."
+          SSM_DB_IDENTIFIER_NAME=/${ENVIRONMENT}/${DEPLOYMENT_PREFIX}/CUSTOMER_DATABASE_IDENTIFIER
+          echo $SSM_DB_IDENTIFIER_NAME
+
+          echo "Retrieving SSM DB Connection String..."
+          DATABASE_CONNECTION_STRING="$(aws ssm get-parameter --name $SSM_CONNECTION_STRING_NAME --with-decryption | jq -r '.Parameter.Value')"
+
+          echo "Retrieving SSM DB Connection String..."
+          DATABASE_IDENTIFIER="$(aws ssm get-parameter --name $SSM_DB_IDENTIFIER_NAME | jq -r '.Parameter.Value')"
+
+          echo "Generating Backup of RDS Instance before migrating and wait for it to finish"
+          aws rds wait db-instance-available --db-instance-identifier $DATABASE_IDENTIFIER
+          SNAPSHOT_ID=$( aws rds create-db-snapshot --db-snapshot-identifier customer-migration-generated-backup-$EPOCHSECONDS --db-instance-identifier $DATABASE_IDENTIFIER --query 'DBSnapshot.[DBSnapshotIdentifier]' --output text )
+          aws rds wait db-snapshot-completed --db-snapshot-identifier $SNAPSHOT_ID
+          aws rds wait db-instance-available --db-instance-identifier $DATABASE_IDENTIFIER
+
+          echo "Saving DB Connection String to .env file..."
+          echo "CUSTOMER_POSTGRES_CONNECTION_STRING"="$DATABASE_CONNECTION_STRING?schema=customer" >> ".env"
+
+          echo "Clean runnings..."
+          npm run clean
+
+          echo "Applying customer migrations to database..."
+          ./node_modules/.bin/prisma migrate deploy --schema ./customer/customer/customer.prisma

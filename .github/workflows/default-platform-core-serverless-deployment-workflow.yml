@@ -1,0 +1,58 @@
+name: Reusable platform core serverless deployment workflow
+
+on:
+  workflow_call:
+    inputs:
+      DEPLOYMENT_PREFIX:
+        required: true
+        type: string
+      ENVIRONMENT:
+        required: true
+        type: string
+      ORG_NAME:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_REGION:
+        required: true
+      PACKAGES_TOKEN:
+        required: true
+
+jobs:
+  serverless-build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+
+      - name: Setup Nodejs
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Create .npmrc
+        uses: FerLuisxd/create-npmrc@3
+        with:
+          org_name: ${{ inputs.ORG_NAME }}
+        env:
+          AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+
+      - name: Build, Test, & Deploy
+        run: |
+          npm install
+          npm run prisma-generate-all
+          DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} npm run deploy
