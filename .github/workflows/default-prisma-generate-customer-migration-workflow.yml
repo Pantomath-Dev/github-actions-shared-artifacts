@@ -146,7 +146,6 @@ jobs:
 
           echo "Clean runnings..."
           npm run clean
-          npm run build
 
           echo "Creating Customer Prisma migration against proper database..."
           ./node_modules/.bin/prisma migrate dev --create-only --schema ./prisma/customer/customer.prisma --name migration
