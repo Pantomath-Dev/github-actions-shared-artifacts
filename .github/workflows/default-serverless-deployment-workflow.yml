@@ -71,3 +71,10 @@ jobs:
         run: |
           npm run build
           DEPLOYMENT_PREFIX=${{ inputs.DEPLOYMENT_PREFIX }} ENVIRONMENT=${{ inputs.ENVIRONMENT }} PRISMA_BUILD_TARGET=${{ inputs.PRISMA_BUILD_TARGET }} npm run deploy
+
+      - name: Archive npm failure logs
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: npm-logs
+          path: ~/.npm/_logs
